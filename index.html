@@ -184,7 +184,7 @@
             font-size: 1.1em;
         }
 
-        .highlighted {
+        .zero {
             background-color: #ffeb3b !important;
             color: #333;
             font-weight: bold;
@@ -196,10 +196,12 @@
             font-weight: bold;
         }
 
-        .crossed {
-            background-color: #f44336 !important;
-            color: white;
-            text-decoration: line-through;
+        .crossed-row {
+            background-color: #ffcdd2 !important;
+        }
+
+        .crossed-col {
+            background-color: #c8e6c9 !important;
         }
 
         .cost-summary {
@@ -298,7 +300,7 @@
     </div>
 
     <script>
-        let matrix = [];
+        let originalMatrix = [];
         let steps = [];
 
         function createMatrix() {
@@ -371,35 +373,31 @@
 
         function solve() {
             try {
-                matrix = getMatrix();
+                originalMatrix = getMatrix();
                 const problemType = document.getElementById('problemType').value;
                 
                 steps = [];
                 
+                // Clonar matriz para trabajar
+                let matrix = originalMatrix.map(row => [...row]);
+                
                 // Para maximización, convertir a minimización
-                let workingMatrix = matrix.map(row => [...row]);
                 if (problemType === 'maximization') {
                     const maxValue = Math.max(...matrix.flat());
-                    workingMatrix = matrix.map(row => row.map(val => maxValue - val));
+                    matrix = matrix.map(row => row.map(val => maxValue - val));
                     
                     steps.push({
                         title: "Paso 0: Conversión para Maximización",
                         description: `Convertimos el problema de maximización a minimización restando cada elemento del valor máximo (${maxValue}).`,
-                        matrix: workingMatrix,
+                        matrix: matrix,
                         type: 'conversion'
                     });
                 }
                 
-                // Paso 1: Restar el mínimo de cada fila
-                const step1Matrix = subtractRowMinimums(workingMatrix);
+                // Ejecutar algoritmo húngaro
+                const result = hungarianAlgorithm(matrix);
                 
-                // Paso 2: Restar el mínimo de cada columna
-                const step2Matrix = subtractColumnMinimums(step1Matrix);
-                
-                // Paso 3: Encontrar asignación óptima
-                const solution = findOptimalAssignment(step2Matrix);
-                
-                displayResults(solution, problemType);
+                displayResults(result, problemType);
                 
             } catch (error) {
                 document.getElementById('results').innerHTML = `
@@ -410,215 +408,250 @@
             }
         }
 
-        function subtractRowMinimums(matrix) {
-            const newMatrix = matrix.map(row => [...row]);
-            const size = matrix.length;
+        function hungarianAlgorithm(matrix) {
+            const n = matrix.length;
+            let costMatrix = matrix.map(row => [...row]);
             
-            for (let i = 0; i < size; i++) {
-                const rowMin = Math.min(...matrix[i]);
-                for (let j = 0; j < size; j++) {
-                    newMatrix[i][j] = matrix[i][j] - rowMin;
+            // Paso 1: Restar mínimo de cada fila
+            for (let i = 0; i < n; i++) {
+                const rowMin = Math.min(...costMatrix[i]);
+                for (let j = 0; j < n; j++) {
+                    costMatrix[i][j] -= rowMin;
                 }
             }
             
             steps.push({
                 title: "Paso 1: Reducción por Filas",
                 description: "Restamos el elemento mínimo de cada fila a todos los elementos de esa fila.",
-                matrix: newMatrix,
+                matrix: costMatrix.map(row => [...row]),
                 type: 'row_reduction'
             });
             
-            return newMatrix;
-        }
-
-        function subtractColumnMinimums(matrix) {
-            const newMatrix = matrix.map(row => [...row]);
-            const size = matrix.length;
-            
-            for (let j = 0; j < size; j++) {
-                const colMin = Math.min(...matrix.map(row => row[j]));
-                for (let i = 0; i < size; i++) {
-                    newMatrix[i][j] = matrix[i][j] - colMin;
+            // Paso 2: Restar mínimo de cada columna
+            for (let j = 0; j < n; j++) {
+                const colMin = Math.min(...costMatrix.map(row => row[j]));
+                for (let i = 0; i < n; i++) {
+                    costMatrix[i][j] -= colMin;
                 }
             }
             
             steps.push({
                 title: "Paso 2: Reducción por Columnas",
                 description: "Restamos el elemento mínimo de cada columna a todos los elementos de esa columna.",
-                matrix: newMatrix,
+                matrix: costMatrix.map(row => [...row]),
                 type: 'column_reduction'
             });
             
-            return newMatrix;
-        }
-
-        function findOptimalAssignment(matrix) {
-            const size = matrix.length;
-            let workingMatrix = matrix.map(row => [...row]);
-            let assignment = new Array(size).fill(-1);
             let iteration = 0;
-            const maxIterations = 20;
+            let assignment = null;
             
-            while (iteration < maxIterations) {
+            while (iteration < 20) {
                 iteration++;
                 
-                // Verificar si podemos hacer una asignación completa
-                const tempAssignment = hungarianAssignment(workingMatrix);
-                const assignedCount = tempAssignment.filter(x => x !== -1).length;
+                // Intentar encontrar asignación óptima
+                assignment = findOptimalAssignment(costMatrix);
+                
+                if (assignment.length === n) {
+                    // Asignación completa encontrada
+                    break;
+                }
+                
+                // Encontrar cobertura mínima de ceros
+                const coverage = findMinimumLineCoverage(costMatrix);
                 
                 steps.push({
-                    title: `Paso ${2 + iteration}: Verificación de Asignación`,
-                    description: `Intentamos encontrar una asignación completa. Asignaciones encontradas: ${assignedCount}/${size}`,
-                    matrix: workingMatrix,
-                    assignment: tempAssignment,
-                    type: 'assignment_check'
+                    title: `Paso ${1 + iteration}: Cobertura de Ceros`,
+                    description: `Cubrimos todos los ceros con ${coverage.lines.length} líneas. Se necesitan ${n} líneas para la solución óptima.`,
+                    matrix: costMatrix.map(row => [...row]),
+                    type: 'coverage',
+                    coverage: coverage
                 });
                 
-                if (assignedCount === size) {
-                    // Asignación completa encontrada
-                    assignment = tempAssignment;
-                    break;
-                } else {
-                    // Necesitamos mejorar la matriz
-                    const coverage = findMinimumCoverage(workingMatrix);
+                if (coverage.lines.length < n) {
+                    // Aplicar transformación de matriz
+                    costMatrix = transformMatrix(costMatrix, coverage);
                     
                     steps.push({
-                        title: `Paso ${2 + iteration}b: Cobertura de Ceros`,
-                        description: `Cubrimos todos los ceros con ${coverage.lines.length} líneas. Necesitamos ${size} líneas para una solución óptima.`,
-                        matrix: workingMatrix,
-                        coverage: coverage,
-                        type: 'coverage_check'
+                        title: `Paso ${1 + iteration}b: Transformación de Matriz`,
+                        description: "Restamos el mínimo no cubierto de elementos no cubiertos y lo sumamos a elementos doblemente cubiertos.",
+                        matrix: costMatrix.map(row => [...row]),
+                        type: 'transformation'
                     });
-                    
-                    if (coverage.lines.length < size) {
-                        // Aplicar el paso de mejora
-                        workingMatrix = improveMatrix(workingMatrix, coverage);
-                        
-                        steps.push({
-                            title: `Paso ${2 + iteration}c: Mejora de la Matriz`,
-                            description: "Aplicamos el método de mejora: restamos el mínimo no cubierto y lo sumamos a elementos doblemente cubiertos.",
-                            matrix: workingMatrix,
-                            type: 'improvement'
-                        });
-                    }
                 }
             }
             
-            if (assignment.filter(x => x !== -1).length < size) {
-                throw new Error("No se pudo encontrar una asignación completa después de " + maxIterations + " iteraciones");
+            if (!assignment || assignment.length !== n) {
+                throw new Error("No se pudo encontrar una asignación completa");
             }
             
-            const totalCost = calculateTotalCost(assignment);
+            // Calcular costo total usando la matriz original
+            const totalCost = assignment.reduce((sum, colIndex, rowIndex) => {
+                return sum + originalMatrix[rowIndex][colIndex];
+            }, 0);
             
             return {
                 assignment: assignment,
                 totalCost: totalCost,
-                finalMatrix: workingMatrix
+                finalMatrix: costMatrix
             };
         }
 
-        function findMinimumCoverage(matrix) {
-            const size = matrix.length;
+        function findOptimalAssignment(matrix) {
+            const n = matrix.length;
+            const assignment = [];
             
-            // Encontrar todas las posiciones de ceros
-            const zeros = [];
-            for (let i = 0; i < size; i++) {
-                for (let j = 0; j < size; j++) {
-                    if (matrix[i][j] === 0) {
-                        zeros.push([i, j]);
+            // Usar algoritmo de búsqueda con backtracking
+            const used = new Array(n).fill(false);
+            
+            function backtrack(row, currentAssignment) {
+                if (row === n) {
+                    return currentAssignment.slice();
+                }
+                
+                for (let col = 0; col < n; col++) {
+                    if (matrix[row][col] === 0 && !used[col]) {
+                        used[col] = true;
+                        currentAssignment[row] = col;
+                        
+                        const result = backtrack(row + 1, currentAssignment);
+                        if (result) {
+                            return result;
+                        }
+                        
+                        used[col] = false;
+                        currentAssignment[row] = -1;
                     }
                 }
+                
+                return null;
             }
             
-            // Usar el teorema de König para encontrar cobertura mínima
-            // Primero encontramos el matching máximo
-            const matching = findMaximumMatching(zeros, size);
+            const result = backtrack(0, new Array(n).fill(-1));
+            return result || [];
+        }
+
+        function findMinimumLineCoverage(matrix) {
+            const n = matrix.length;
             
-            // El tamaño de la cobertura mínima = tamaño del matching máximo
+            // Encontrar asignación máxima en grafo bipartito de ceros
+            const maxMatching = findMaximumMatching(matrix);
+            
+            // Usar teorema de König para encontrar cobertura mínima
             const matchedRows = new Set();
             const matchedCols = new Set();
             
-            for (const [row, col] of matching) {
+            for (const [row, col] of maxMatching) {
                 matchedRows.add(row);
                 matchedCols.add(col);
             }
             
-            // Encontrar vértices no matcheados en filas
+            // Encontrar filas no emparejadas
             const unmatchedRows = [];
-            for (let i = 0; i < size; i++) {
+            for (let i = 0; i < n; i++) {
                 if (!matchedRows.has(i)) {
                     unmatchedRows.push(i);
                 }
             }
             
-            // Construir grafo de ceros
-            const graph = new Array(size).fill(null).map(() => []);
-            for (const [i, j] of zeros) {
-                graph[i].push(j);
-            }
-            
-            // Encontrar vértices alcanzables desde filas no matcheadas
+            // BFS/DFS desde filas no emparejadas
             const reachableRows = new Set(unmatchedRows);
             const reachableCols = new Set();
-            const visited = new Set();
+            const queue = [...unmatchedRows];
             
-            function dfsReachable(row) {
-                if (visited.has('r' + row)) return;
-                visited.add('r' + row);
+            while (queue.length > 0) {
+                const row = queue.shift();
                 
-                for (const col of graph[row]) {
-                    if (!reachableCols.has(col)) {
+                // Encontrar columnas alcanzables desde esta fila
+                for (let col = 0; col < n; col++) {
+                    if (matrix[row][col] === 0 && !reachableCols.has(col)) {
                         reachableCols.add(col);
                         
-                        // Encontrar la fila matcheada con esta columna
-                        for (const [mRow, mCol] of matching) {
+                        // Encontrar fila emparejada con esta columna
+                        for (const [mRow, mCol] of maxMatching) {
                             if (mCol === col && !reachableRows.has(mRow)) {
                                 reachableRows.add(mRow);
-                                dfsReachable(mRow);
+                                queue.push(mRow);
                             }
                         }
                     }
                 }
             }
             
-            for (const row of unmatchedRows) {
-                dfsReachable(row);
-            }
-            
-            // La cobertura mínima consiste en:
-            // - Filas matcheadas NO alcanzables
-            // - Columnas alcanzables
-            const coveringRows = [];
-            const coveringCols = [];
+            // Cobertura mínima: filas emparejadas no alcanzables + columnas alcanzables
             const lines = [];
+            const coveredRows = [];
+            const coveredCols = [];
             
-            for (let i = 0; i < size; i++) {
+            for (let i = 0; i < n; i++) {
                 if (matchedRows.has(i) && !reachableRows.has(i)) {
-                    coveringRows.push(i);
-                    lines.push({type: 'row', index: i});
+                    lines.push({ type: 'row', index: i });
+                    coveredRows.push(i);
                 }
             }
             
             for (const col of reachableCols) {
-                coveringCols.push(col);
-                lines.push({type: 'col', index: col});
+                lines.push({ type: 'col', index: col });
+                coveredCols.push(col);
             }
             
             return {
                 lines: lines,
-                coveredRows: coveringRows,
-                coveredCols: coveringCols
+                coveredRows: coveredRows,
+                coveredCols: coveredCols
             };
         }
 
-        function improveMatrix(matrix, coverage) {
-            const size = matrix.length;
+        function findMaximumMatching(matrix) {
+            const n = matrix.length;
+            const matching = [];
+            const colUsed = new Array(n).fill(false);
+            
+            // Algoritmo húngaro simplificado para encontrar matching máximo
+            for (let row = 0; row < n; row++) {
+                const visited = new Array(n).fill(false);
+                findAugmentingPath(matrix, row, colUsed, visited, matching);
+            }
+            
+            return matching;
+        }
+
+        function findAugmentingPath(matrix, row, colUsed, visited, matching) {
+            const n = matrix.length;
+            
+            for (let col = 0; col < n; col++) {
+                if (matrix[row][col] === 0 && !visited[col]) {
+                    visited[col] = true;
+                    
+                    if (!colUsed[col]) {
+                        // Columna libre, crear nueva asignación
+                        colUsed[col] = true;
+                        matching.push([row, col]);
+                        return true;
+                    } else {
+                        // Columna ocupada, intentar reasignar
+                        const matchedRowIndex = matching.findIndex(([r, c]) => c === col);
+                        if (matchedRowIndex !== -1) {
+                            const matchedRow = matching[matchedRowIndex][0];
+                            if (findAugmentingPath(matrix, matchedRow, colUsed, visited, matching)) {
+                                matching[matchedRowIndex] = [row, col];
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return false;
+        }
+
+        function transformMatrix(matrix, coverage) {
+            const n = matrix.length;
             const newMatrix = matrix.map(row => [...row]);
             
-            // Encontrar el mínimo elemento no cubierto
+            // Encontrar mínimo elemento no cubierto
             let minUncovered = Infinity;
-            for (let i = 0; i < size; i++) {
-                for (let j = 0; j < size; j++) {
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
                     if (!coverage.coveredRows.includes(i) && !coverage.coveredCols.includes(j)) {
                         minUncovered = Math.min(minUncovered, matrix[i][j]);
                     }
@@ -626,124 +659,26 @@
             }
             
             // Aplicar transformación
-            for (let i = 0; i < size; i++) {
-                for (let j = 0; j < size; j++) {
-                    if (!coverage.coveredRows.includes(i) && !coverage.coveredCols.includes(j)) {
-                        // Elemento no cubierto: restar el mínimo
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    const rowCovered = coverage.coveredRows.includes(i);
+                    const colCovered = coverage.coveredCols.includes(j);
+                    
+                    if (!rowCovered && !colCovered) {
+                        // No cubierto: restar mínimo
                         newMatrix[i][j] = matrix[i][j] - minUncovered;
-                    } else if (coverage.coveredRows.includes(i) && coverage.coveredCols.includes(j)) {
-                        // Elemento doblemente cubierto: sumar el mínimo
+                    } else if (rowCovered && colCovered) {
+                        // Doblemente cubierto: sumar mínimo
                         newMatrix[i][j] = matrix[i][j] + minUncovered;
                     }
-                    // Elementos cubiertos una vez: no cambian
+                    // Cubierto una vez: no cambiar
                 }
             }
             
             return newMatrix;
         }
 
-        function findAssignment(matrix) {
-            const size = matrix.length;
-            const assignment = new Array(size).fill(-1);
-            
-            // Implementación del algoritmo húngaro para encontrar asignación máxima
-            const result = hungarianAssignment(matrix);
-            
-            return result;
-        }
-        
-        function hungarianAssignment(matrix) {
-            const size = matrix.length;
-            const assignment = new Array(size).fill(-1);
-            
-            // Crear matriz de ceros para trabajar
-            const zeros = [];
-            for (let i = 0; i < size; i++) {
-                for (let j = 0; j < size; j++) {
-                    if (matrix[i][j] === 0) {
-                        zeros.push([i, j]);
-                    }
-                }
-            }
-            
-            // Usar algoritmo de matching bipartito
-            const matching = findMaximumMatching(zeros, size);
-            
-            // Convertir matching a array de asignación
-            for (const [row, col] of matching) {
-                assignment[row] = col;
-            }
-            
-            return assignment;
-        }
-        
-        function findMaximumMatching(zeros, size) {
-            const graph = new Array(size).fill(null).map(() => []);
-            
-            // Construir grafo de ceros
-            for (const [i, j] of zeros) {
-                graph[i].push(j);
-            }
-            
-            const matching = [];
-            const usedCols = new Set();
-            const visited = new Array(size);
-            
-            // Intento de asignación usando DFS
-            for (let row = 0; row < size; row++) {
-                visited.fill(false);
-                if (dfs(row, graph, matching, usedCols, visited, size)) {
-                    // Se encontró una asignación para esta fila
-                }
-            }
-            
-            return matching;
-        }
-        
-        function dfs(row, graph, matching, usedCols, visited, size) {
-            for (const col of graph[row]) {
-                if (visited[col]) continue;
-                visited[col] = true;
-                
-                // Si la columna está libre o podemos reasignar
-                let currentRowForCol = -1;
-                for (let i = 0; i < matching.length; i++) {
-                    if (matching[i][1] === col) {
-                        currentRowForCol = matching[i][0];
-                        break;
-                    }
-                }
-                
-                if (currentRowForCol === -1) {
-                    // Columna libre, asignar
-                    matching.push([row, col]);
-                    usedCols.add(col);
-                    return true;
-                } else if (dfs(currentRowForCol, graph, matching, usedCols, visited, size)) {
-                    // Reasignar
-                    for (let i = 0; i < matching.length; i++) {
-                        if (matching[i][0] === currentRowForCol) {
-                            matching[i] = [row, col];
-                            break;
-                        }
-                    }
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        function calculateTotalCost(assignment) {
-            let total = 0;
-            for (let i = 0; i < assignment.length; i++) {
-                if (assignment[i] !== -1) {
-                    total += matrix[i][assignment[i]];
-                }
-            }
-            return total;
-        }
-
-        function displayResults(solution, problemType) {
+        function displayResults(result, problemType) {
             const resultsDiv = document.getElementById('results');
             let html = '<div class="results">';
             
@@ -755,7 +690,7 @@
                         <h3>${step.title}</h3>
                         <p>${step.description}</p>
                         <div class="matrix-display">
-                            ${createTableHTML(step.matrix, step.type, step.coverage, step.assignment)}
+                            ${createTableHTML(step.matrix, step.type, step.coverage)}
                         </div>
                     </div>
                 `;
@@ -767,12 +702,12 @@
                     <h3>Solución Óptima</h3>
                     <p>Asignación encontrada:</p>
                     <div class="matrix-display">
-                        ${createSolutionTableHTML(solution.assignment)}
+                        ${createSolutionTableHTML(result.assignment)}
                     </div>
                 </div>
                 
                 <div class="cost-summary">
-                    <div>💰 Costo Total ${problemType === 'maximization' ? '(Beneficio)' : ''}: ${solution.totalCost}</div>
+                    <div>💰 Costo Total ${problemType === 'maximization' ? '(Beneficio Máximo)' : '(Costo Mínimo)'}: ${result.totalCost}</div>
                 </div>
             `;
             
@@ -780,41 +715,39 @@
             resultsDiv.innerHTML = html;
         }
 
-        function createTableHTML(matrix, type = '', coverage = null, assignment = null) {
-            const size = matrix.length;
+        function createTableHTML(matrix, type = '', coverage = null) {
+            const n = matrix.length;
             let html = '<table>';
             
             // Encabezados
             html += '<tr><th></th>';
-            for (let j = 0; j < size; j++) {
+            for (let j = 0; j < n; j++) {
                 html += `<th>C${j + 1}</th>`;
             }
             html += '</tr>';
             
             // Filas de datos
-            for (let i = 0; i < size; i++) {
+            for (let i = 0; i < n; i++) {
                 html += `<tr><th>F${i + 1}</th>`;
-                for (let j = 0; j < size; j++) {
+                for (let j = 0; j < n; j++) {
                     let cellClass = '';
-                    let cellValue = matrix[i][j];
                     
-                    // Mostrar asignaciones si están disponibles
-                    if (type === 'assignment_check' && assignment && assignment[i] === j) {
-                        cellClass += ' assigned';
-                        cellValue += ' ✓';
+                    // Resaltar ceros
+                    if (matrix[i][j] === 0) {
+                        cellClass += ' zero';
                     }
                     
-                    if (type === 'coverage_check' && coverage) {
-                        if (coverage.coveredRows.includes(i) || coverage.coveredCols.includes(j)) {
-                            cellClass += ' crossed';
+                    // Mostrar cobertura
+                    if (type === 'coverage' && coverage) {
+                        if (coverage.coveredRows.includes(i)) {
+                            cellClass += ' crossed-row';
+                        }
+                        if (coverage.coveredCols.includes(j)) {
+                            cellClass += ' crossed-col';
                         }
                     }
                     
-                    if (matrix[i][j] === 0 && !cellClass.includes('assigned')) {
-                        cellClass += ' highlighted';
-                    }
-                    
-                    html += `<td class="${cellClass}">${cellValue}</td>`;
+                    html += `<td class="${cellClass}">${matrix[i][j]}</td>`;
                 }
                 html += '</tr>';
             }
@@ -824,22 +757,22 @@
         }
 
         function createSolutionTableHTML(assignment) {
-            const size = assignment.length;
+            const n = assignment.length;
             let html = '<table>';
             
             // Encabezados
             html += '<tr><th></th>';
-            for (let j = 0; j < size; j++) {
+            for (let j = 0; j < n; j++) {
                 html += `<th>C${j + 1}</th>`;
             }
             html += '</tr>';
             
             // Filas de datos
-            for (let i = 0; i < size; i++) {
+            for (let i = 0; i < n; i++) {
                 html += `<tr><th>F${i + 1}</th>`;
-                for (let j = 0; j < size; j++) {
+                for (let j = 0; j < n; j++) {
                     let cellClass = '';
-                    let cellValue = matrix[i][j];
+                    let cellValue = originalMatrix[i][j];
                     
                     if (assignment[i] === j) {
                         cellClass = 'assigned';
@@ -856,9 +789,7 @@
             // Agregar descripción de la asignación
             html += '<div style="margin-top: 15px;"><strong>Asignación:</strong><br>';
             for (let i = 0; i < assignment.length; i++) {
-                if (assignment[i] !== -1) {
-                    html += `Fila ${i + 1} → Columna ${assignment[i] + 1} (Costo: ${matrix[i][assignment[i]]})<br>`;
-                }
+                html += `Fila ${i + 1} → Columna ${assignment[i] + 1} (Costo: ${originalMatrix[i][assignment[i]]})<br>`;
             }
             html += '</div>';
             
