@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solucionador Método Húngaro</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2196F3, #21CBF3);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .input-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 2px solid #e9ecef;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #2196F3;
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+        }
+
+        .matrix-container {
+            margin: 20px 0;
+        }
+
+        .matrix-input {
+            display: grid;
+            gap: 10px;
+            max-width: fit-content;
+            margin: 0 auto;
+        }
+
+        .matrix-input input {
+            width: 80px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        button {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+            margin: 10px 5px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        .solve-btn {
+            background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+        }
+
+        .solve-btn:hover {
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+        }
+
+        .results {
+            margin-top: 30px;
+        }
+
+        .step {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-left: 5px solid #2196F3;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .step h3 {
+            color: #2196F3;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #e3f2fd;
+            padding-bottom: 10px;
+        }
+
+        .matrix-display {
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: center;
+            border: 1px solid #ddd;
+            font-weight: 600;
+        }
+
+        th {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-size: 1.1em;
+        }
+
+        .zero {
+            background-color: #ffeb3b !important;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .assigned {
+            background-color: #4caf50 !important;
+            color: white;
+            font-weight: bold;
+        }
+
+        .crossed-row {
+            background-color: #ffcdd2 !important;
+        }
+
+        .crossed-col {
+            background-color: #c8e6c9 !important;
+        }
+
+        .cost-summary {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-top: 20px;
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .example-buttons {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .example-btn {
+            background: linear-gradient(135deg, #9C27B0, #E1BEE7);
+            box-shadow: 0 4px 15px rgba(156, 39, 176, 0.3);
+        }
+
+        .example-btn:hover {
+            box-shadow: 0 6px 20px rgba(156, 39, 176, 0.4);
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border-left: 5px solid #f44336;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .content {
+                padding: 15px;
+            }
+            
+            .matrix-input input {
+                width: 60px;
+            }
+            
+            th, td {
+                padding: 8px 10px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔢 Solucionador Método Húngaro</h1>
+            <p>Resuelve problemas de asignación paso a paso</p>
+        </div>
+        
+        <div class="content">
+            <div class="input-section">
+                <div class="input-group">
+                    <label for="problemType">Tipo de Problema:</label>
+                    <select id="problemType">
+                        <option value="minimization">Minimización</option>
+                        <option value="maximization">Maximización</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label for="matrixSize">Tamaño de la Matriz:</label>
+                    <input type="number" id="matrixSize" min="2" max="6" value="3">
+                    <button onclick="createMatrix()">Crear Matriz</button>
+                </div>
+                
+                <div class="example-buttons">
+                    <button class="example-btn" onclick="loadExample(1)">Ejemplo 1 (3x3)</button>
+                    <button class="example-btn" onclick="loadExample(2)">Ejemplo 2 (4x4)</button>
+                    <button class="example-btn" onclick="loadExample(3)">Ejemplo 3 (5x5)</button>
+                </div>
+                
+                <div id="matrixContainer"></div>
+                
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="solve-btn" onclick="solve()">🚀 Resolver</button>
+                </div>
+            </div>
+            
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <script>
+        let originalMatrix = [];
+        let steps = [];
+
+        function createMatrix() {
+            const size = parseInt(document.getElementById('matrixSize').value);
+            const container = document.getElementById('matrixContainer');
+            
+            container.innerHTML = `
+                <div class="matrix-container">
+                    <h3>Matriz de Costos:</h3>
+                    <div class="matrix-input" id="matrixInput"></div>
+                </div>
+            `;
+            
+            const matrixInput = document.getElementById('matrixInput');
+            matrixInput.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+            
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.id = `cell_${i}_${j}`;
+                    input.placeholder = '0';
+                    input.value = '0';
+                    matrixInput.appendChild(input);
+                }
+            }
+        }
+
+        function loadExample(exampleNum) {
+            if (exampleNum === 1) {
+                document.getElementById('matrixSize').value = 3;
+                createMatrix();
+                const example1 = [[4, 2, 8], [4, 3, 7], [1, 2, 5]];
+                loadMatrixValues(example1);
+            } else if (exampleNum === 2) {
+                document.getElementById('matrixSize').value = 4;
+                createMatrix();
+                const example2 = [[10, 2, 8, 6], [9, 4, 7, 8], [7, 6, 5, 2], [8, 1, 4, 9]];
+                loadMatrixValues(example2);
+            } else if (exampleNum === 3) {
+                document.getElementById('matrixSize').value = 5;
+                createMatrix();
+                const example3 = [[12, 7, 9, 7, 9], [8, 9, 6, 6, 6], [7, 17, 12, 14, 6], [15, 13, 6, 6, 10], [4, 15, 4, 12, 8]];
+                loadMatrixValues(example3);
+            }
+        }
+
+        function loadMatrixValues(values) {
+            for (let i = 0; i < values.length; i++) {
+                for (let j = 0; j < values[i].length; j++) {
+                    document.getElementById(`cell_${i}_${j}`).value = values[i][j];
+                }
+            }
+        }
+
+        function getMatrix() {
+            const size = parseInt(document.getElementById('matrixSize').value);
+            const matrix = [];
+            
+            for (let i = 0; i < size; i++) {
+                matrix[i] = [];
+                for (let j = 0; j < size; j++) {
+                    const value = parseFloat(document.getElementById(`cell_${i}_${j}`).value) || 0;
+                    matrix[i][j] = value;
+                }
+            }
+            
+            return matrix;
+        }
+
+        function solve() {
+            try {
+                originalMatrix = getMatrix();
+                const problemType = document.getElementById('problemType').value;
+                
+                steps = [];
+                
+                // Clonar matriz para trabajar
+                let matrix = originalMatrix.map(row => [...row]);
+                
+                // Para maximización, convertir a minimización
+                if (problemType === 'maximization') {
+                    const maxValue = Math.max(...matrix.flat());
+                    matrix = matrix.map(row => row.map(val => maxValue - val));
+                    
+                    steps.push({
+                        title: "Paso 0: Conversión para Maximización",
+                        description: `Convertimos el problema de maximización a minimización restando cada elemento del valor máximo (${maxValue}).`,
+                        matrix: matrix,
+                        type: 'conversion'
+                    });
+                }
+                
+                // Ejecutar algoritmo húngaro
+                const result = hungarianAlgorithm(matrix);
+                
+                displayResults(result, problemType);
+                
+            } catch (error) {
+                document.getElementById('results').innerHTML = `
+                    <div class="error">
+                        <strong>Error:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function hungarianAlgorithm(matrix) {
+            const n = matrix.length;
+            let costMatrix = matrix.map(row => [...row]);
+            
+            // Paso 1: Restar mínimo de cada fila
+            for (let i = 0; i < n; i++) {
+                const rowMin = Math.min(...costMatrix[i]);
+                for (let j = 0; j < n; j++) {
+                    costMatrix[i][j] -= rowMin;
+                }
+            }
+            
+            steps.push({
+                title: "Paso 1: Reducción por Filas",
+                description: "Restamos el elemento mínimo de cada fila a todos los elementos de esa fila.",
+                matrix: costMatrix.map(row => [...row]),
+                type: 'row_reduction'
+            });
+            
+            // Paso 2: Restar mínimo de cada columna
+            for (let j = 0; j < n; j++) {
+                const colMin = Math.min(...costMatrix.map(row => row[j]));
+                for (let i = 0; i < n; i++) {
+                    costMatrix[i][j] -= colMin;
+                }
+            }
+            
+            steps.push({
+                title: "Paso 2: Reducción por Columnas",
+                description: "Restamos el elemento mínimo de cada columna a todos los elementos de esa columna.",
+                matrix: costMatrix.map(row => [...row]),
+                type: 'column_reduction'
+            });
+            
+            let iteration = 0;
+            let assignment = null;
+            
+            while (iteration < 20) {
+                iteration++;
+                
+                // Intentar encontrar asignación óptima
+                assignment = findOptimalAssignment(costMatrix);
+                
+                if (assignment.length === n) {
+                    // Asignación completa encontrada
+                    break;
+                }
+                
+                // Encontrar cobertura mínima de ceros
+                const coverage = findMinimumLineCoverage(costMatrix);
+                
+                steps.push({
+                    title: `Paso ${1 + iteration}: Cobertura de Ceros`,
+                    description: `Cubrimos todos los ceros con ${coverage.lines.length} líneas. Se necesitan ${n} líneas para la solución óptima.`,
+                    matrix: costMatrix.map(row => [...row]),
+                    type: 'coverage',
+                    coverage: coverage
+                });
+                
+                if (coverage.lines.length < n) {
+                    // Aplicar transformación de matriz
+                    costMatrix = transformMatrix(costMatrix, coverage);
+                    
+                    steps.push({
+                        title: `Paso ${1 + iteration}b: Transformación de Matriz`,
+                        description: "Restamos el mínimo no cubierto de elementos no cubiertos y lo sumamos a elementos doblemente cubiertos.",
+                        matrix: costMatrix.map(row => [...row]),
+                        type: 'transformation'
+                    });
+                }
+            }
+            
+            if (!assignment || assignment.length !== n) {
+                throw new Error("No se pudo encontrar una asignación completa");
+            }
+            
+            // Calcular costo total usando la matriz original
+            const totalCost = assignment.reduce((sum, colIndex, rowIndex) => {
+                return sum + originalMatrix[rowIndex][colIndex];
+            }, 0);
+            
+            return {
+                assignment: assignment,
+                totalCost: totalCost,
+                finalMatrix: costMatrix
+            };
+        }
+
+        function findOptimalAssignment(matrix) {
+            const n = matrix.length;
+            const assignment = [];
+            
+            // Usar algoritmo de búsqueda con backtracking
+            const used = new Array(n).fill(false);
+            
+            function backtrack(row, currentAssignment) {
+                if (row === n) {
+                    return currentAssignment.slice();
+                }
+                
+                for (let col = 0; col < n; col++) {
+                    if (matrix[row][col] === 0 && !used[col]) {
+                        used[col] = true;
+                        currentAssignment[row] = col;
+                        
+                        const result = backtrack(row + 1, currentAssignment);
+                        if (result) {
+                            return result;
+                        }
+                        
+                        used[col] = false;
+                        currentAssignment[row] = -1;
+                    }
+                }
+                
+                return null;
+            }
+            
+            const result = backtrack(0, new Array(n).fill(-1));
+            return result || [];
+        }
+
+        function findMinimumLineCoverage(matrix) {
+            const n = matrix.length;
+            
+            // Encontrar asignación máxima en grafo bipartito de ceros
+            const maxMatching = findMaximumMatching(matrix);
+            
+            // Usar teorema de König para encontrar cobertura mínima
+            const matchedRows = new Set();
+            const matchedCols = new Set();
+            
+            for (const [row, col] of maxMatching) {
+                matchedRows.add(row);
+                matchedCols.add(col);
+            }
+            
+            // Encontrar filas no emparejadas
+            const unmatchedRows = [];
+            for (let i = 0; i < n; i++) {
+                if (!matchedRows.has(i)) {
+                    unmatchedRows.push(i);
+                }
+            }
+            
+            // BFS/DFS desde filas no emparejadas
+            const reachableRows = new Set(unmatchedRows);
+            const reachableCols = new Set();
+            const queue = [...unmatchedRows];
+            
+            while (queue.length > 0) {
+                const row = queue.shift();
+                
+                // Encontrar columnas alcanzables desde esta fila
+                for (let col = 0; col < n; col++) {
+                    if (matrix[row][col] === 0 && !reachableCols.has(col)) {
+                        reachableCols.add(col);
+                        
+                        // Encontrar fila emparejada con esta columna
+                        for (const [mRow, mCol] of maxMatching) {
+                            if (mCol === col && !reachableRows.has(mRow)) {
+                                reachableRows.add(mRow);
+                                queue.push(mRow);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Cobertura mínima: filas emparejadas no alcanzables + columnas alcanzables
+            const lines = [];
+            const coveredRows = [];
+            const coveredCols = [];
+            
+            for (let i = 0; i < n; i++) {
+                if (matchedRows.has(i) && !reachableRows.has(i)) {
+                    lines.push({ type: 'row', index: i });
+                    coveredRows.push(i);
+                }
+            }
+            
+            for (const col of reachableCols) {
+                lines.push({ type: 'col', index: col });
+                coveredCols.push(col);
+            }
+            
+            return {
+                lines: lines,
+                coveredRows: coveredRows,
+                coveredCols: coveredCols
+            };
+        }
+
+        function findMaximumMatching(matrix) {
+            const n = matrix.length;
+            const matching = [];
+            const colUsed = new Array(n).fill(false);
+            
+            // Algoritmo húngaro simplificado para encontrar matching máximo
+            for (let row = 0; row < n; row++) {
+                const visited = new Array(n).fill(false);
+                findAugmentingPath(matrix, row, colUsed, visited, matching);
+            }
+            
+            return matching;
+        }
+
+        function findAugmentingPath(matrix, row, colUsed, visited, matching) {
+            const n = matrix.length;
+            
+            for (let col = 0; col < n; col++) {
+                if (matrix[row][col] === 0 && !visited[col]) {
+                    visited[col] = true;
+                    
+                    if (!colUsed[col]) {
+                        // Columna libre, crear nueva asignación
+                        colUsed[col] = true;
+                        matching.push([row, col]);
+                        return true;
+                    } else {
+                        // Columna ocupada, intentar reasignar
+                        const matchedRowIndex = matching.findIndex(([r, c]) => c === col);
+                        if (matchedRowIndex !== -1) {
+                            const matchedRow = matching[matchedRowIndex][0];
+                            if (findAugmentingPath(matrix, matchedRow, colUsed, visited, matching)) {
+                                matching[matchedRowIndex] = [row, col];
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return false;
+        }
+
+        function transformMatrix(matrix, coverage) {
+            const n = matrix.length;
+            const newMatrix = matrix.map(row => [...row]);
+            
+            // Encontrar mínimo elemento no cubierto
+            let minUncovered = Infinity;
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    if (!coverage.coveredRows.includes(i) && !coverage.coveredCols.includes(j)) {
+                        minUncovered = Math.min(minUncovered, matrix[i][j]);
+                    }
+                }
+            }
+            
+            // Aplicar transformación
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    const rowCovered = coverage.coveredRows.includes(i);
+                    const colCovered = coverage.coveredCols.includes(j);
+                    
+                    if (!rowCovered && !colCovered) {
+                        // No cubierto: restar mínimo
+                        newMatrix[i][j] = matrix[i][j] - minUncovered;
+                    } else if (rowCovered && colCovered) {
+                        // Doblemente cubierto: sumar mínimo
+                        newMatrix[i][j] = matrix[i][j] + minUncovered;
+                    }
+                    // Cubierto una vez: no cambiar
+                }
+            }
+            
+            return newMatrix;
+        }
+
+        function displayResults(result, problemType) {
+            const resultsDiv = document.getElementById('results');
+            let html = '<div class="results">';
+            
+            // Mostrar todos los pasos
+            for (let i = 0; i < steps.length; i++) {
+                const step = steps[i];
+                html += `
+                    <div class="step">
+                        <h3>${step.title}</h3>
+                        <p>${step.description}</p>
+                        <div class="matrix-display">
+                            ${createTableHTML(step.matrix, step.type, step.coverage)}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Mostrar solución final
+            html += `
+                <div class="step">
+                    <h3>Solución Óptima</h3>
+                    <p>Asignación encontrada:</p>
+                    <div class="matrix-display">
+                        ${createSolutionTableHTML(result.assignment)}
+                    </div>
+                </div>
+                
+                <div class="cost-summary">
+                    <div>💰 Costo Total ${problemType === 'maximization' ? '(Beneficio Máximo)' : '(Costo Mínimo)'}: ${result.totalCost}</div>
+                </div>
+            `;
+            
+            html += '</div>';
+            resultsDiv.innerHTML = html;
+        }
+
+        function createTableHTML(matrix, type = '', coverage = null) {
+            const n = matrix.length;
+            let html = '<table>';
+            
+            // Encabezados
+            html += '<tr><th></th>';
+            for (let j = 0; j < n; j++) {
+                html += `<th>C${j + 1}</th>`;
+            }
+            html += '</tr>';
+            
+            // Filas de datos
+            for (let i = 0; i < n; i++) {
+                html += `<tr><th>F${i + 1}</th>`;
+                for (let j = 0; j < n; j++) {
+                    let cellClass = '';
+                    
+                    // Resaltar ceros
+                    if (matrix[i][j] === 0) {
+                        cellClass += ' zero';
+                    }
+                    
+                    // Mostrar cobertura
+                    if (type === 'coverage' && coverage) {
+                        if (coverage.coveredRows.includes(i)) {
+                            cellClass += ' crossed-row';
+                        }
+                        if (coverage.coveredCols.includes(j)) {
+                            cellClass += ' crossed-col';
+                        }
+                    }
+                    
+                    html += `<td class="${cellClass}">${matrix[i][j]}</td>`;
+                }
+                html += '</tr>';
+            }
+            
+            html += '</table>';
+            return html;
+        }
+
+        function createSolutionTableHTML(assignment) {
+            const n = assignment.length;
+            let html = '<table>';
+            
+            // Encabezados
+            html += '<tr><th></th>';
+            for (let j = 0; j < n; j++) {
+                html += `<th>C${j + 1}</th>`;
+            }
+            html += '</tr>';
+            
+            // Filas de datos
+            for (let i = 0; i < n; i++) {
+                html += `<tr><th>F${i + 1}</th>`;
+                for (let j = 0; j < n; j++) {
+                    let cellClass = '';
+                    let cellValue = originalMatrix[i][j];
+                    
+                    if (assignment[i] === j) {
+                        cellClass = 'assigned';
+                        cellValue += ' ✓';
+                    }
+                    
+                    html += `<td class="${cellClass}">${cellValue}</td>`;
+                }
+                html += '</tr>';
+            }
+            
+            html += '</table>';
+            
+            // Agregar descripción de la asignación
+            html += '<div style="margin-top: 15px;"><strong>Asignación:</strong><br>';
+            for (let i = 0; i < assignment.length; i++) {
+                html += `Fila ${i + 1} → Columna ${assignment[i] + 1} (Costo: ${originalMatrix[i][assignment[i]]})<br>`;
+            }
+            html += '</div>';
+            
+            return html;
+        }
+
+        // Inicializar con matriz 3x3
+        window.onload = function() {
+            createMatrix();
+        };
+    </script>
+</body>
+</html>
